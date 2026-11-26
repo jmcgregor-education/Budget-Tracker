@@ -77,6 +77,14 @@ section{margin-bottom:30px}
 .tx .del.armed{border-color:var(--over);color:var(--over)}
 .empty-note{color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:16px}
 .cats.plain{background:none;border:0}
+select{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:11px 12px}
+.amt.plus{color:var(--good)}
+.rollnote{display:block;font-weight:400;font-size:.85rem;color:var(--good)}
+.editrow .roll{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:.92rem;color:var(--muted);margin:-2px 0 8px}
+.editrow .roll input{width:18px;height:18px;accent-color:var(--accent)}
+.rollbox{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:16px;font-size:.95rem}
+.rollbox .del{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 10px;cursor:pointer;color:var(--muted);font-size:.85rem}
+.rollbox .del.armed{border-color:var(--over);color:var(--over)}
 .cats.plain li{border:0}
 #fundRemove.armed{border-color:var(--over);color:var(--over)}
 .status{font-size:.88rem;color:var(--muted);margin:-12px 0 18px}
@@ -164,6 +172,7 @@ input[type=text],input[type=date],input[type=number]{width:100%;border:1px solid
     </section>
 
     <div class="cyclebar" id="cyclebar">
+      <button class="secondary" id="openXfer">Move money</button>
       <button class="secondary" id="startCycle">Start new month</button>
     </div>
 
@@ -281,6 +290,27 @@ input[type=text],input[type=date],input[type=number]{width:100%;border:1px solid
   </form>
 </dialog>
 
+<dialog id="catDlg" aria-labelledby="catH">
+  <div class="sheet">
+    <h2 id="catH">Category</h2>
+    <p class="big" id="catLeft" style="font-size:2.6rem">$0</p>
+    <p class="of" id="catOf" style="margin-bottom:10px"></p>
+    <div class="bar" id="catBarWrap" style="margin-bottom:14px"><span id="catBar"></span></div>
+    <div class="rollbox" id="catRoll" hidden>
+      <span id="catRollText"></span>
+      <button type="button" class="del" id="catRollReset">Reset</button>
+    </div>
+    <div class="actions" style="margin-bottom:18px">
+      <button type="button" class="primary" id="catAddExp">Add expense</button>
+      <button type="button" class="secondary" id="catXfer">Move money</button>
+    </div>
+    <ul class="txlist" id="catTxList"></ul>
+    <div class="actions" style="margin-top:18px">
+      <button type="button" class="secondary" id="catClose">Done</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="fundDlg" aria-labelledby="fundH">
   <div class="sheet">
     <div id="fundView">
@@ -290,11 +320,12 @@ input[type=text],input[type=date],input[type=number]{width:100%;border:1px solid
       <div class="bar" style="margin-bottom:18px"><span id="fundBar"></span></div>
       <div class="actions" style="margin-bottom:18px">
         <button type="button" class="primary" id="fundAddExp">Add expense</button>
-        <button type="button" class="secondary" id="fundEditBtn">Edit</button>
+        <button type="button" class="secondary" id="fundXfer">Move money</button>
       </div>
       <ul class="txlist" id="fundTxList"></ul>
       <div class="actions" style="margin-top:18px">
-        <button type="button" class="secondary" id="fundRemove">Remove budget</button>
+        <button type="button" class="secondary" id="fundEditBtn">Edit</button>
+        <button type="button" class="secondary" id="fundRemove">Remove</button>
         <button type="button" class="secondary" id="fundClose">Done</button>
       </div>
     </div>
@@ -317,6 +348,34 @@ input[type=text],input[type=date],input[type=number]{width:100%;border:1px solid
   </div>
 </dialog>
 
+<dialog id="xferDlg" aria-labelledby="xferH">
+  <form class="sheet" id="xferForm" novalidate>
+    <h2 id="xferH">Move money</h2>
+    <div class="field">
+      <label for="xAmt">Amount</label>
+      <div class="money"><span>$</span><input id="xAmt" inputmode="decimal" autocomplete="off" placeholder="0.00"></div>
+    </div>
+    <div class="field">
+      <label for="xFrom">From</label>
+      <select id="xFrom"></select>
+      <p class="hint" id="xFromHint" style="margin:6px 0 0"></p>
+    </div>
+    <div class="field">
+      <label for="xTo">To</label>
+      <select id="xTo"></select>
+    </div>
+    <div class="field">
+      <label for="xNote">Note <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+      <input type="text" id="xNote" maxlength="80" placeholder="Covering a big grocery week…">
+    </div>
+    <p class="err" id="xErr"></p>
+    <div class="actions">
+      <button type="button" class="secondary" id="xCancel">Cancel</button>
+      <button type="submit" class="primary" id="xSave">Move money</button>
+    </div>
+  </form>
+</dialog>
+
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -325,16 +384,17 @@ const DEFAULTS = {
   income: 7800,
   cycleDay: 29,
   funds: [],
+  rolloverFrom: {},
   spending: [
-    {id:"groceries", name:"Groceries & household", amount:1550},
-    {id:"eatingout", name:"Eating out", amount:250},
-    {id:"kids", name:"Kids", amount:200},
-    {id:"gas", name:"Gas", amount:175},
-    {id:"clothing", name:"Clothing", amount:150},
-    {id:"medical", name:"Medical", amount:100},
-    {id:"buffer", name:"Buffer", amount:100},
-    {id:"gifts", name:"Gifts & holidays", amount:75},
-    {id:"maint", name:"Car & home maintenance", amount:50}
+    {id:"groceries", name:"Groceries & household", amount:1550, rollover:false},
+    {id:"eatingout", name:"Eating out", amount:250, rollover:true},
+    {id:"kids", name:"Kids", amount:200, rollover:true},
+    {id:"gas", name:"Gas", amount:175, rollover:false},
+    {id:"clothing", name:"Clothing", amount:150, rollover:true},
+    {id:"medical", name:"Medical", amount:100, rollover:true},
+    {id:"buffer", name:"Buffer", amount:100, rollover:false},
+    {id:"gifts", name:"Gifts & holidays", amount:75, rollover:true},
+    {id:"maint", name:"Car & home maintenance", amount:50, rollover:true}
   ],
   bills: [
     {id:"mortgage", name:"Mortgage", amount:2402},
@@ -381,7 +441,9 @@ function normalize(s){
     if(typeof s.income==="number" && isFinite(s.income)) out.income=s.income;
     const d=Number(s.cycleDay); if(d>=1 && d<=31) out.cycleDay=Math.round(d);
     const sp=normList(s.spending||s.categories), bi=normList(s.bills||s.commitments);
-    if(sp) out.spending=sp; if(bi) out.bills=bi;
+    if(sp){ const src=s.spending||s.categories; out.spending=sp.map((c,i)=>{ const o=src.find(x=>x&&String(x.id)===c.id)||{}; const d=DEFAULTS.spending.find(x=>x.id===c.id); c.rollover = typeof o.rollover==="boolean" ? o.rollover : !!(d&&d.rollover); return c; }); }
+    if(bi) out.bills=bi;
+    if(s.rolloverFrom && typeof s.rolloverFrom==="object") Object.keys(s.rolloverFrom).forEach(k=>{ const v=s.rolloverFrom[k]; if(typeof v==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(v)) out.rolloverFrom[k]=v; });
     const fu=normList(s.funds); if(fu) out.funds=fu;
   }
   return out;
@@ -399,6 +461,9 @@ let cycles = normCycles(lsGet("bt2:cycles", []));
 let viewIdx = -1; // -1 = latest
 let tx = [];
 let fundTx = [];
+let allTx = [];
+let xfers = [], cycXfers = [];
+let openCatId = null;
 let openFundId = null;
 let db=null, unsubTx=null, canWrite=true, loadTimer=null;
 
@@ -413,9 +478,30 @@ function isLatest(){ return curIdx()===allCycles().length-1; }
 function cycleEnd(i){ const list=allCycles(); return i<list.length-1 ? addDays(list[i+1].start,-1) : addDays(addMonth(list[i].start),-1); }
 function cats(){ return settings.spending.concat(settings.bills); }
 
-function localTx(){ const id=curCycle().id; return lsGet("bt2:tx",[]).filter(t=>t && t.kind!=="fund" && t.cycle===id); }
-function localFundTx(){ return lsGet("bt2:tx",[]).filter(t=>t && t.kind==="fund"); }
-function refreshLocal(){ tx=localTx(); fundTx=localFundTx(); render(); }
+function deriveTx(){ const id=curCycle().id; tx=allTx.filter(t=>t && t.kind!=="fund" && t.kind!=="transfer" && t.cycle===id); fundTx=allTx.filter(t=>t && t.kind==="fund"); xfers=allTx.filter(t=>t && t.kind==="transfer"); cycXfers=xfers.filter(t=>t.cycle===id); }
+function adjFor(list){ const m={}; list.forEach(t=>{ const a=Number(t.amount)||0; m[t.from]=(m[t.from]||0)+a; m[t.to]=(m[t.to]||0)-a; }); return m; }
+const isSpend = id => settings.spending.some(c=>c.id===id);
+function availableFor(id){
+  const f=settings.funds.find(x=>x.id===id);
+  if(f){ let u=(adjFor(xfers)[id]||0); fundTx.forEach(t=>{ if(t.fund===id) u+=Number(t.amount)||0; }); return f.amount-u; }
+  const c=settings.spending.find(x=>x.id===id); if(!c) return 0;
+  let u=(adjFor(cycXfers)[id]||0); tx.forEach(t=>{ if(t.cat===id) u+=Number(t.amount)||0; });
+  return c.amount+rolloverFor(c,curIdx())-u;
+}
+function refreshLocal(){ if(!db) allTx=lsGet("bt2:tx",[]); deriveTx(); render(); }
+function rolloverFor(c, idx){
+  if(!c || !c.rollover) return 0;
+  const list=allCycles(), from=settings.rolloverFrom[c.id]||"";
+  let bal=0;
+  for(let k=0;k<idx;k++){
+    const cy=list[k]; if(cy.start<from) continue;
+    let sp=0; allTx.forEach(t=>{ if(!t || t.cycle!==cy.id) return; const a=Number(t.amount)||0;
+      if(t.kind==="transfer"){ if(t.from===c.id) sp+=a; if(t.to===c.id) sp-=a; }
+      else if(t.kind!=="fund" && t.cat===c.id) sp+=a; });
+    bal+=c.amount-sp;
+  }
+  return Math.round(bal*100)/100;
+}
 const isFund = id => settings.funds.some(f=>f.id===id);
 
 /* ---------- render ---------- */
@@ -423,24 +509,33 @@ function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className
 
 function catRow(r, kind, pace){
   const li=el("li"); const b=el("button","cat"); b.type="button";
-  b.setAttribute("aria-label","Add expense to "+r.name);
-  const row=el("div","catrow"); row.append(el("span","catname",r.name));
-  const l=r.amount-r.spent;
+  b.setAttribute("aria-label","Open "+r.name);
+  const row=el("div","catrow");
+  const nm=el("span","catname",r.name);
+  const roll=r.roll||0, mv=r.moved||0, avail=r.amount+roll+mv;
+  if(kind!=="bill"){
+    const notes=[];
+    if(Math.abs(roll)>=0.005) notes.push((roll>0?"+":"−")+money(Math.abs(roll))+" rolled over");
+    if(Math.abs(mv)>=0.005) notes.push((mv>0?"+":"−")+money(Math.abs(mv))+" moved "+(mv>0?"in":"out"));
+    if(notes.length) nm.append(el("span","rollnote", notes.join(", ")));
+  }
+  row.append(nm);
+  const l=(kind==="bill"?r.amount:avail)-r.spent;
   if(kind==="bill"){
     if(r.amount>0 && r.spent>=r.amount-0.005) row.append(el("span","paid", r.spent>r.amount+0.005 ? "Paid, "+money(r.spent-r.amount)+" over" : "Paid"));
     else row.append(el("span","catleft", r.spent>0 ? money(l)+" left of "+money(r.amount) : money(r.amount)+" due"));
   } else {
-    row.append(el("span","catleft"+(l<0?" over":""), l<0 ? money(-l)+" over" : money(l)+" left of "+money(r.amount)));
+    row.append(el("span","catleft"+(l<0?" over":""), l<0 ? money(-l)+" over" : money(l)+" left of "+money(avail)));
   }
   b.append(row);
   if(kind!=="bill"){
     const bar=el("div","bar"); const s=el("span");
-    const p=r.amount>0 ? r.spent/r.amount : (r.spent>0?1:0);
+    const p=avail>0 ? r.spent/avail : (r.spent>0?1:0);
     s.style.width=Math.min(p,1)*100+"%";
     if(l<0) s.className="over"; else if(pace!=null && p>pace+0.1) s.className="warn";
     bar.append(s); b.append(bar);
   }
-  b.addEventListener("click",()=>openAdd(r.id, kind==="bill" && r.spent<r.amount ? Math.max(r.amount-r.spent,0) : null));
+  b.addEventListener("click",()=>openCat(r.id));
   li.append(b); return li;
 }
 
@@ -453,6 +548,8 @@ function render(){
 
   const spentBy={}; let spent=0;
   tx.forEach(t=>{const a=Number(t.amount)||0;spent+=a;spentBy[t.cat]=(spentBy[t.cat]||0)+a;});
+  const madj=adjFor(cycXfers);
+  const moved={}; settings.spending.forEach(c=>{ const a=madj[c.id]; if(a){ moved[c.id]=-a; spent+=a; } });
   const left=settings.income-spent;
   const big=$("leftBig"); big.textContent = left<0 ? "−"+money(-left) : money(left); big.classList.toggle("neg",left<0);
   $("ofLine").textContent = (left<0?"over your ":"of your ")+money(settings.income)+" income, with "+money(spent)+" spent";
@@ -468,7 +565,8 @@ function render(){
   if(pace!=null){ mark.style.display="block"; mark.style.left="calc("+(pace*100)+"% - 1px)"; } else mark.style.display="none";
 
   // spending section
-  const spendTotal=settings.spending.reduce((a,c)=>a+c.amount,0);
+  const rolls={}; settings.spending.forEach(c=>{ rolls[c.id]=rolloverFor(c,i); });
+  const spendTotal=settings.spending.reduce((a,c)=>a+c.amount+rolls[c.id]+(moved[c.id]||0),0);
   const spendSpent=settings.spending.reduce((a,c)=>a+(spentBy[c.id]||0),0)+(spentBy.other||0);
   const sLeft=spendTotal-spendSpent;
   $("spendSum").textContent = sLeft<0 ? money(-sLeft)+" over" : money(sLeft)+" left of "+money(spendTotal);
@@ -483,7 +581,7 @@ function render(){
   $("paceLine").textContent = pace!=null ? days+(days===1?" day":" days")+" left. The black line is today." : (latest ? "This month hasn’t started yet." : (left>=0 ? "Finished with "+money(left)+" left." : "Finished "+money(-left)+" over."));
 
   const sl=$("spendList"); sl.textContent="";
-  settings.spending.forEach(c=>sl.append(catRow({id:c.id,name:c.name,amount:c.amount,spent:spentBy[c.id]||0},"spend",pace)));
+  settings.spending.forEach(c=>sl.append(catRow({id:c.id,name:c.name,amount:c.amount,roll:rolls[c.id],moved:moved[c.id]||0,spent:spentBy[c.id]||0},"spend",pace)));
   const known=new Set(cats().map(c=>c.id));
   const orphan=Object.keys(spentBy).filter(k=>!known.has(k)).reduce((a,k)=>a+spentBy[k],0);
   if(orphan>0) sl.append(catRow({id:"other",name:"Other",amount:0,spent:orphan},"spend",null));
@@ -498,16 +596,17 @@ function render(){
 
   // expenses
   const tl=$("txList"); tl.textContent="";
-  const sorted=tx.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
+  const sorted=tx.concat(cycXfers).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
   if(!sorted.length) tl.append(el("li","empty-note", latest ? "Nothing logged yet. Tap “Add expense,” a category, or a bill to log one." : "Nothing was logged this month."));
   sorted.forEach(x=>tl.append(txRow(x)));
 
   // special budgets
   const fl=$("fundList"); fl.textContent="";
   const fSpent={}; fundTx.forEach(t=>{fSpent[t.fund]=(fSpent[t.fund]||0)+(Number(t.amount)||0);});
+  const fadj=adjFor(xfers);
   let fTot=0,fUsed=0;
-  settings.funds.forEach(f=>{ fTot+=f.amount; fUsed+=fSpent[f.id]||0;
-    const li=catRow({id:f.id,name:f.name,amount:f.amount,spent:fSpent[f.id]||0},"spend",null);
+  settings.funds.forEach(f=>{ const fm=-(fadj[f.id]||0); fTot+=f.amount+fm; fUsed+=fSpent[f.id]||0;
+    const li=catRow({id:f.id,name:f.name,amount:f.amount,moved:fm,spent:fSpent[f.id]||0},"spend",null);
     const b=li.firstChild; const nb=b.cloneNode(true); nb.setAttribute("aria-label","Open "+f.name);
     nb.addEventListener("click",()=>openFund(f.id)); li.replaceChild(nb,b); fl.append(li); });
   if(!settings.funds.length) fl.append(el("li","empty-note","No special budgets yet."));
@@ -515,19 +614,32 @@ function render(){
   $("fundsSum").textContent = settings.funds.length ? (fTot-fUsed<0 ? money(fUsed-fTot)+" over" : money(fTot-fUsed)+" left of "+money(fTot)) : "";
   $("addFund").disabled=!canWrite;
   if(openFundId && $("fundDlg").open) renderFund();
+  if(openCatId && $("catDlg").open) renderCat();
 
   $("openAdd").disabled=!canWrite;
   $("cyclebar").hidden=!latest;
+  $("openXfer").disabled=!canWrite || (settings.spending.length+settings.funds.length)<2;
   $("startCycle").disabled=!canWrite;
 }
 
-function txRow(x){
+function txRow(x, ctx){
   const names=Object.fromEntries(cats().concat(settings.funds,[OTHER]).map(c=>[c.id,c.name]));
-  const li=el("li","tx"); const cn=names[x.cat]||"Other";
-  li.append(el("span","what", x.note||cn));
-  const d=x.date?short(x.date):"";
-  li.append(el("span","meta", x.note ? cn+", "+d : d));
-  li.append(el("span","amt", money(Number(x.amount)||0)));
+  const li=el("li","tx"); const d=x.date?short(x.date):"";
+  let cn;
+  if(x.kind==="transfer"){
+    const fn=names[x.from]||"Removed budget", tn=names[x.to]||"Removed budget";
+    const what = ctx===x.from ? "Moved to "+tn : ctx===x.to ? "Moved from "+fn : fn+" → "+tn;
+    cn="transfer";
+    li.append(el("span","what", what));
+    li.append(el("span","meta", x.note ? x.note+", "+d : d));
+    const sign = ctx===x.to ? "+" : ctx===x.from ? "−" : "";
+    li.append(el("span","amt"+(sign==="+"?" plus":""), sign+money(Number(x.amount)||0)));
+  } else {
+    cn=names[x.cat]||"Other";
+    li.append(el("span","what", x.note||cn));
+    li.append(el("span","meta", x.note ? cn+", "+d : d));
+    li.append(el("span","amt", money(Number(x.amount)||0)));
+  }
   const del=el("button","del","Delete"); del.type="button";
   del.setAttribute("aria-label","Delete "+money(Number(x.amount)||0)+" "+cn+" expense");
   let tm=null;
@@ -553,16 +665,7 @@ function handleWriteError(e){
   return "Couldn’t save. Check your connection and try again.";
 }
 
-function loadTx(){
-  if(!db){ refreshLocal(); return; }
-  if(unsubTx) unsubTx();
-  startLoadTimer();
-  unsubTx=db.collection("transactions").where("cycle","==",curCycle().id).onSnapshot(s=>{
-    tx=s.docs.map(d=>Object.assign({id:d.id},d.data()));
-    if(!s.metadata.fromCache) settled();
-    render();
-  },()=>settled());
-}
+function loadTx(){ refreshLocal(); }
 
 async function saveCycles(list){
   if(db) await db.doc("budget/cycles").set({list:list});
@@ -674,7 +777,14 @@ function editRow(item,listName){
   a.addEventListener("input",()=>{item.amount=Number(a.value)||0; renderSummary();});
   const rm=el("button","rm","×"); rm.type="button"; rm.setAttribute("aria-label","Remove "+(item.name||"item"));
   rm.addEventListener("click",()=>{draft[listName]=draft[listName].filter(x=>x!==item); renderEditor();});
-  li.append(n,a,rm); return li;
+  li.append(n,a,rm);
+  if(listName==="spending"){
+    const lab=el("label","roll"); const cb=el("input"); cb.type="checkbox"; cb.checked=!!item.rollover;
+    cb.addEventListener("change",()=>{item.rollover=cb.checked;});
+    lab.append(cb, document.createTextNode("Roll over unused money"));
+    li.append(lab);
+  }
+  return li;
 }
 function renderSummary(){
   const sp=draft.spending.reduce((s,c)=>s+c.amount,0), bi=draft.bills.reduce((s,c)=>s+c.amount,0);
@@ -701,10 +811,10 @@ $("addSpend").addEventListener("click",()=>addRow("spending","spendEdit","s"));
 $("addBill").addEventListener("click",()=>addRow("bills","billEdit","b"));
 $("cancelBudget").addEventListener("click",()=>showBudget(false));
 $("saveBudget").addEventListener("click",async()=>{
-  const clean=l=>l.filter(x=>x.name.trim()||x.amount).map(x=>({id:x.id,name:(x.name.trim()||"Untitled").slice(0,60),amount:Math.round((Number(x.amount)||0)*100)/100}));
+  const clean=l=>l.filter(x=>x.name.trim()||x.amount).map(x=>{ const o={id:x.id,name:(x.name.trim()||"Untitled").slice(0,60),amount:Math.round((Number(x.amount)||0)*100)/100}; if(x.rollover) o.rollover=true; return o; });
   const day=Math.round(Number($("dayIn").value));
   if(!(day>=1&&day<=31)){ $("budgetErr").textContent="Enter a start day from 1 to 31."; return; }
-  const s={income:Number($("incomeIn").value)||0,cycleDay:day,spending:clean(draft.spending),bills:clean(draft.bills),funds:settings.funds,updatedAt:Date.now()};
+  const s={income:Number($("incomeIn").value)||0,cycleDay:day,spending:clean(draft.spending),bills:clean(draft.bills),funds:settings.funds,rolloverFrom:settings.rolloverFrom,updatedAt:Date.now()};
   const b=$("saveBudget"); b.disabled=true;
   try{ await saveSettings(s); showBudget(false); toast("Budget saved"); }
   catch(e){ $("budgetErr").textContent=handleWriteError(e); }
@@ -725,12 +835,120 @@ $("importIn").addEventListener("change",async e=>{
     const d=JSON.parse(await f.text());
     if(!d || d.app!=="family-budget" || !Array.isArray(d.tx)) throw new Error("bad");
     const s=normalize(d.settings), c=normCycles(d.cycles);
-    const t=d.tx.filter(x=>x && typeof x.amount==="number" && (typeof x.cycle==="string" || x.kind==="fund")).map(x=>({id:String(x.id||uid("t")),amount:x.amount,cat:String(x.cat||"other"),note:String(x.note||"").slice(0,80),date:String(x.date||""),kind:x.kind==="fund"?"fund":"month",fund:x.kind==="fund"?String(x.fund||x.cat):undefined,cycle:x.kind==="fund"?null:x.cycle,createdAt:Number(x.createdAt)||0}));
+    const t=d.tx.filter(x=>x && typeof x.amount==="number" && (typeof x.cycle==="string" || x.kind==="fund")).map(x=>{
+      if(x.kind==="transfer") return {id:String(x.id||uid("t")),kind:"transfer",amount:x.amount,from:String(x.from||""),to:String(x.to||""),note:String(x.note||"").slice(0,80),date:String(x.date||""),cycle:x.cycle,createdAt:Number(x.createdAt)||0};
+      return {id:String(x.id||uid("t")),amount:x.amount,cat:String(x.cat||"other"),note:String(x.note||"").slice(0,80),date:String(x.date||""),kind:x.kind==="fund"?"fund":"month",fund:x.kind==="fund"?String(x.fund||x.cat):undefined,cycle:x.kind==="fund"?null:x.cycle,createdAt:Number(x.createdAt)||0}; });
     if(!lsSet("bt2:settings",s)||!lsSet("bt2:cycles",c)||!lsSet("bt2:tx",t)) throw {code:"local_full"};
     settings=s; cycles=c; viewIdx=-1; draft=clone(settings);
     $("incomeIn").value=draft.income; $("dayIn").value=draft.cycleDay; renderEditor(); loadTx();
     $("budgetErr").textContent=""; toast("Backup restored");
   }catch(err){ $("budgetErr").textContent = err&&err.code==="local_full" ? handleWriteError(err) : "That file isn’t a budget backup. Pick a file you downloaded from this app."; }
+});
+
+/* ---------- move money ---------- */
+const xdlg=$("xferDlg");
+function fillSelect(sel, pick){
+  sel.textContent="";
+  const grp=(label,list)=>{ if(!list.length) return; const g=document.createElement("optgroup"); g.label=label;
+    list.forEach(c=>{ const o=document.createElement("option"); o.value=c.id; o.textContent=c.name; if(c.id===pick) o.selected=true; g.append(o); }); sel.append(g); };
+  grp("Spending",settings.spending); grp("Special budgets",settings.funds);
+}
+function xHint(){ const id=$("xFrom").value; const a=availableFor(id); const n=(settings.spending.concat(settings.funds).find(c=>c.id===id)||{}).name||"";
+  $("xFromHint").textContent = a<0 ? n+" is already "+money(-a)+" over." : n+" has "+money(a)+" available."; }
+function openXfer(fromId){
+  if(!canWrite) return;
+  const all=settings.spending.concat(settings.funds); if(all.length<2) return;
+  const from=fromId||all[0].id; const to=(all.find(c=>c.id!==from)||{}).id;
+  fillSelect($("xFrom"),from); fillSelect($("xTo"),to);
+  $("xAmt").value=""; $("xNote").value=""; $("xErr").textContent=""; xHint();
+  if(typeof xdlg.showModal==="function") xdlg.showModal(); else xdlg.setAttribute("open","");
+  setTimeout(()=>$("xAmt").focus(),50);
+}
+$("xFrom").addEventListener("change",xHint);
+$("openXfer").addEventListener("click",()=>openXfer(null));
+$("xCancel").addEventListener("click",()=>closeDlg(xdlg));
+xdlg.addEventListener("click",e=>{if(e.target===xdlg) closeDlg(xdlg);});
+$("xferForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const amt=Math.round(parseFloat($("xAmt").value.replace(/[$,\s]/g,""))*100)/100;
+  const from=$("xFrom").value, to=$("xTo").value;
+  if(!isFinite(amt)||amt<=0){ $("xErr").textContent="Enter an amount above $0."; $("xAmt").focus(); return; }
+  if(!from||!to||from===to){ $("xErr").textContent="Pick two different budgets."; return; }
+  const b=$("xSave"); b.disabled=true;
+  try{
+    const cy=await ensureCycle();
+    await addTx({id:uid("t"),kind:"transfer",amount:amt,from:from,to:to,note:$("xNote").value.trim().slice(0,80),date:todayStr(),cycle:cy.id,createdAt:Date.now()});
+    closeDlg(xdlg); toast("Money moved");
+  }catch(err){ $("xErr").textContent=handleWriteError(err); }
+  b.disabled=false;
+});
+
+/* ---------- category detail ---------- */
+const kdlg=$("catDlg");
+function findCat(id){ return settings.spending.find(c=>c.id===id) || settings.bills.find(c=>c.id===id) || (id==="other"?OTHER:null); }
+function renderCat(){
+  const c=findCat(openCatId); if(!c){ closeDlg(kdlg); return; }
+  const isBill=settings.bills.some(x=>x.id===c.id);
+  const known=new Set(cats().map(x=>x.id));
+  const exps=tx.filter(t=> c.id==="other" ? !known.has(t.cat) : t.cat===c.id);
+  const xs=isSpend(c.id) ? cycXfers.filter(t=>t.from===c.id||t.to===c.id) : [];
+  const list=exps.concat(xs).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
+  const used=exps.reduce((a,t)=>a+(Number(t.amount)||0),0), mv=-(adjFor(xs)[c.id]||0);
+  const roll=isBill?0:rolloverFor(c,curIdx()), avail=c.amount+roll+mv, left=avail-used;
+  $("catH").textContent=c.name;
+  const big=$("catLeft");
+  if(isBill){
+    const paid=c.amount>0 && used>=c.amount-0.005;
+    big.textContent = paid ? "Paid" : money(c.amount-used)+" due"; big.classList.remove("neg");
+    $("catOf").textContent = money(used)+" paid of "+money(c.amount)+" this month";
+  } else if(c.id==="other"){
+    big.textContent=money(used); big.classList.remove("neg");
+    $("catOf").textContent="spent on other things this month";
+  } else {
+    big.textContent=left<0?"−"+money(-left):money(left); big.classList.toggle("neg",left<0);
+    let base=money(c.amount);
+    if(Math.abs(roll)>=0.005) base+=(roll>0?" + ":" − ")+money(Math.abs(roll))+" rolled over";
+    if(Math.abs(mv)>=0.005) base+=(mv>0?" + ":" − ")+money(Math.abs(mv))+" moved";
+    $("catOf").textContent=(left<0?"over your ":"left of ")+base+", with "+money(used)+" spent";
+  }
+  const bw=$("catBarWrap"); bw.hidden = isBill || c.id==="other";
+  const bar=$("catBar"); const p=avail>0?used/avail:(used>0?1:0); bar.style.width=Math.min(p,1)*100+"%"; bar.className=left<0?"over":"";
+  const rb=$("catRoll");
+  if(!isBill && c.rollover && Math.abs(roll)>=0.005){
+    rb.hidden=false;
+    $("catRollText").textContent = roll>0 ? money(roll)+" rolled over from past months" : money(-roll)+" overspent in past months";
+    $("catRollReset").hidden = !isLatest() || !canWrite;
+  } else rb.hidden=true;
+  const ul=$("catTxList"); ul.textContent="";
+  if(!list.length) ul.append(el("li","empty-note","Nothing logged here this month."));
+  list.forEach(x=>ul.append(txRow(x,c.id)));
+  $("catAddExp").disabled=!canWrite;
+  $("catXfer").hidden=!isSpend(c.id); $("catXfer").disabled=!canWrite;
+}
+function openCat(id){
+  openCatId=id;
+  const r=$("catRollReset"); r.classList.remove("armed"); r.textContent="Reset";
+  renderCat();
+  if(typeof kdlg.showModal==="function") kdlg.showModal(); else kdlg.setAttribute("open","");
+}
+$("catClose").addEventListener("click",()=>closeDlg(kdlg));
+kdlg.addEventListener("click",e=>{if(e.target===kdlg) closeDlg(kdlg);});
+$("catAddExp").addEventListener("click",()=>{
+  const c=findCat(openCatId); const isBill=c && settings.bills.some(x=>x.id===c.id);
+  let pre=null;
+  if(isBill){ const used=tx.filter(t=>t.cat===c.id).reduce((a,t)=>a+(Number(t.amount)||0),0); if(used<c.amount) pre=c.amount-used; }
+  closeDlg(kdlg); openAdd(openCatId==="other"?"other":openCatId, pre);
+});
+$("catXfer").addEventListener("click",()=>{ const id=openCatId; closeDlg(kdlg); openXfer(id); });
+$("fundXfer").addEventListener("click",()=>{ const id=openFundId; closeDlg(fdlg); openXfer(id); });
+let rrT=null;
+$("catRollReset").addEventListener("click",async()=>{
+  const r=$("catRollReset");
+  if(!r.classList.contains("armed")){ r.classList.add("armed"); r.textContent="Tap to confirm"; rrT=setTimeout(()=>{r.classList.remove("armed");r.textContent="Reset";},3000); return; }
+  clearTimeout(rrT);
+  const rf=Object.assign({},settings.rolloverFrom); rf[openCatId]=curCycle().start;
+  try{ await saveSettings(Object.assign(clone(settings),{rolloverFrom:rf,updatedAt:Date.now()})); settings.rolloverFrom=rf; renderCat(); render(); toast("Rollover reset"); }
+  catch(e){ toast(handleWriteError(e)); }
 });
 
 /* ---------- special budgets ---------- */
@@ -745,15 +963,18 @@ function showFundForm(edit){
 }
 function renderFund(){
   const f=settings.funds.find(x=>x.id===openFundId); if(!f){ closeDlg(fdlg); return; }
-  const list=fundTx.filter(t=>t.fund===f.id).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
-  const used=list.reduce((a,t)=>a+(Number(t.amount)||0),0), left=f.amount-used;
+  const exps=fundTx.filter(t=>t.fund===f.id), xs=xfers.filter(t=>t.from===f.id||t.to===f.id);
+  const list=exps.concat(xs).sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
+  const used=exps.reduce((a,t)=>a+(Number(t.amount)||0),0), mv=-(adjFor(xs)[f.id]||0), avail=f.amount+mv, left=avail-used;
   $("fundH").textContent=f.name;
   const fl=$("fundLeft"); fl.textContent=left<0?"−"+money(-left):money(left); fl.classList.toggle("neg",left<0);
-  $("fundOf").textContent=(left<0?"over your ":"left of ")+money(f.amount)+", with "+money(used)+" spent";
-  const bar=$("fundBar"); const p=f.amount>0?used/f.amount:(used>0?1:0); bar.style.width=Math.min(p,1)*100+"%"; bar.className=left<0?"over":"";
+  const fbase=money(f.amount)+(Math.abs(mv)>=0.005 ? (mv>0?" + ":" − ")+money(Math.abs(mv))+" moved" : "");
+  $("fundOf").textContent=(left<0?"over your ":"left of ")+fbase+", with "+money(used)+" spent";
+  const bar=$("fundBar"); const p=avail>0?used/avail:(used>0?1:0); bar.style.width=Math.min(p,1)*100+"%"; bar.className=left<0?"over":"";
   const ul=$("fundTxList"); ul.textContent="";
   if(!list.length) ul.append(el("li","empty-note","Nothing spent from this budget yet."));
-  list.forEach(x=>ul.append(txRow(x)));
+  list.forEach(x=>ul.append(txRow(x,f.id)));
+  $("fundXfer").disabled=!canWrite;
   $("fundAddExp").disabled=$("fundEditBtn").disabled=$("fundRemove").disabled=!canWrite;
 }
 function openFund(id){
@@ -802,19 +1023,19 @@ $("fundRemove").addEventListener("click",async()=>{
 });
 
 /* ---------- start ---------- */
-tx=localTx(); fundTx=localFundTx(); render();
+refreshLocal();
 (async()=>{
   let ns=null;
   try{ ns=(window.claude && typeof window.claude.use==="function") ? await window.claude.use("db") : null; }catch(e){ ns=null; }
   if(!ns){ setStatus(""); return; }
   db=ns; startLoadTimer();
-  db.collection("transactions").where("kind","==","fund").onSnapshot(s=>{ fundTx=s.docs.map(d=>Object.assign({id:d.id},d.data())); render(); },()=>{});
+  db.collection("transactions").onSnapshot(s=>{ allTx=s.docs.map(d=>Object.assign({id:d.id},d.data())); if(!s.metadata.fromCache) settled(); deriveTx(); render(); },()=>settled());
   db.doc("budget/settings").onSnapshot(s=>{ settings=normalize(s.exists?s.data():null); if(!s.metadata.fromCache) settled(); render(); },()=>settled());
   let first=true;
   db.doc("budget/cycles").onSnapshot(s=>{
     const prevId=curCycle().id;
     cycles=normCycles(s.exists?(s.data()||{}).list:[]);
-    if(first || curCycle().id!==prevId){ first=false; loadTx(); } else render();
+    first=false; void prevId; deriveTx(); render();
   },()=>settled());
 })();
 })();
